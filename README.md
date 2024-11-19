@@ -8,6 +8,7 @@ Aplicación Android que se comunica con un vehículo controlado por una Raspberr
 - **Raspberry Pi**: con ROS y los siguientes paquetes instalados:
   - `rosbridge_server` para la comunicación WebSocket
   - `rosserial_python` para la comunicación serial
+  - `qr_detector` para detección de códigos QR
 - **Conexión Wi-Fi**: Ambos dispositivos deben estar conectados a la misma red.
 
 ## Configuración de la Raspberry Pi
@@ -48,7 +49,7 @@ Aplicación Android que se comunica con un vehículo controlado por una Raspberr
    - **Terminal 2**: Inicia el nodo de ROS para la comunicación serial con el microcontrolador:
 
      ```bash
-     rosrun rosserial_python serial_node.py /dev/ttyACM0
+     rosrun rosserial_python serial_node.py /dev/ttyACM0 _baud:=57600
      ```
 
      Verifica el puerto asignado ejecutando:
@@ -78,6 +79,28 @@ Aplicación Android que se comunica con un vehículo controlado por una Raspberr
      ```
 
      Una vez iniciado, el servidor WebSocket esperará conexiones de clientes y notificará cuando uno se haya conectado y comience a recibir datos de suscriptores.
+
+   - **Terminal 4**: Configuración de la detección de códigos QR para señalización de stop en el celular. Primero, verifica el puerto de la cámara conectada al robot:
+
+     ```bash
+     v4l2-ctl --list-devices
+     ```
+
+     Luego, navega a la ruta de tu espacio de trabajo de ROS y carga las variables de entorno:
+
+     ```bash
+     cd ~/catkin_ws
+     source devel/setup.bash
+     ```
+
+     Ejecuta el nodo de detección de códigos QR:
+
+     ```bash
+     rosrun qr_detector qr_detector_node.py _camera_index:=<ID>
+     ```
+
+     Este nodo utilizará la cámara conectada al robot para detectar códigos QR y, si se detecta un código específico, enviará una señalización de stop al dispositivo Android.
+
 ## Uso de la Aplicación
 
 1. **Ejecutar la Aplicación Android**: Inicia la aplicación en tu dispositivo Android. La aplicación intentará conectarse al servidor WebSocket en la dirección IP de la Raspberry Pi configurada en `MainActivity`.
