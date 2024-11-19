@@ -7,6 +7,7 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+    <!-- CanvasView -->
     <com.example.controlmapavehiculo.CanvasView
         android:id="@+id/canvasView"
         android:layout_width="0dp"
@@ -19,7 +20,37 @@
         app:layout_constraintHeight_percent="0.5"
         android:layout_margin="16dp" />
 
-    <!-- Contenedor para los controles (mitad inferior de la pantalla) -->
+    <!-- Contenedor para el label de señalización -->
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toTopOf="@id/canvasView"
+        app:layout_constraintEnd_toEndOf="@id/canvasView"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="16dp">
+
+        <!-- TextView para mostrar el estado de señalización -->
+        <TextView
+            android:id="@+id/tvSignalStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No señalización"
+            android:textColor="@android:color/black"
+            android:textSize="18sp"
+            android:visibility="visible" />
+
+        <!-- ImageView para mostrar la imagen de señalización (invisible por defecto) -->
+        <ImageView
+            android:id="@+id/imgSignal"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:src="@drawable/stop"
+            android:visibility="gone"
+            android:layout_gravity="center" />
+
+    </FrameLayout>
+
+    <!-- Contenedor para los controles -->
     <LinearLayout
         android:id="@+id/controlsLayout"
         android:layout_width="0dp"
@@ -99,7 +130,8 @@
                 android:layout_height="wrap_content"
                 android:text="Resetear Canvas"
                 android:textSize="14dp"
-                android:layout_marginStart="16dp" android:textAllCaps="false"
+                android:layout_marginStart="16dp"
+                android:textAllCaps="false"
                 />
         </LinearLayout>
 
@@ -108,7 +140,7 @@
             android:layout_width="200dp"
             android:layout_height="200dp">
 
-            <!-- Botón para ir recto (arriba) -->
+            <!-- Botones de control -->
             <Button
                 android:id="@+id/btnForward"
                 android:layout_width="70dp"
@@ -119,7 +151,6 @@
                 app:layout_constraintEnd_toEndOf="parent"
                 android:layout_marginBottom="16dp"/>
 
-            <!-- Botón para ir a la izquierda -->
             <Button
                 android:id="@+id/btnLeft"
                 android:layout_width="60dp"
@@ -131,7 +162,6 @@
                 app:layout_constraintEnd_toStartOf="@id/btnStop"
                 android:layout_marginEnd="16dp"/>
 
-            <!-- Botón para ir a la derecha -->
             <Button
                 android:id="@+id/btnRight"
                 android:layout_width="60dp"
@@ -143,7 +173,6 @@
                 app:layout_constraintStart_toEndOf="@id/btnStop"
                 android:layout_marginStart="16dp" />
 
-            <!-- Botón para ir hacia abajo -->
             <Button
                 android:id="@+id/btnReverse"
                 android:layout_width="70dp"
@@ -154,7 +183,6 @@
                 app:layout_constraintEnd_toEndOf="parent"
                 android:layout_marginTop="16dp" />
 
-            <!-- Botón de freno en el centro -->
             <Button
                 android:id="@+id/btnStop"
                 android:layout_width="60dp"

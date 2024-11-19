@@ -11,17 +11,19 @@ import android.widget.Switch;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.os.Handler;
+import android.widget.ImageView;
 
 public class MainActivity extends AppCompatActivity {
     private ROSWebSocketClient webSocketClient;  // Cliente WebSocket para conexión ROS
     private CanvasView canvasView;  // Vista personalizada para dibujar la trayectoria
     private Button btnForward, btnReverse, btnLeft1, btnRight1, btnStop;  // Botones de dirección
-    private TextView txtDecision;  // Texto que muestra decisiones actuales
+    private TextView txtDecision, tvSignalStatus;  // Texto que muestra decisiones actuales
     private Switch switchMode;  // Switch para alternar entre modo manual y automático
     boolean flag;  // Bandera para el estado del modo
     private Handler handler = new Handler();  // Handler para manejo de acciones programadas
     private Runnable sendStateRunnable;  // Runnable para enviar estado
     private Button btnResetCanvas;  // Botón para resetear el lienzo
+    private ImageView imgSignal;  // ImageView para mostrar la señalización
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +34,9 @@ public class MainActivity extends AppCompatActivity {
         txtDecision = findViewById(R.id.tvDecision);
         canvasView = findViewById(R.id.canvasView);
         switchMode = findViewById(R.id.switchMode);
+        tvSignalStatus = findViewById(R.id.tvSignalStatus);  // Referencia al TextView de "No señalización"
+        imgSignal = findViewById(R.id.imgSignal);  // Referencia al ImageView de señalización
+
 
         // Configurar los botones de dirección
         btnForward = findViewById(R.id.btnForward);
@@ -44,13 +49,15 @@ public class MainActivity extends AppCompatActivity {
         // Inicializar la conexión WebSocket
         try {
             webSocketClient = new ROSWebSocketClient(
-                    "ws://192.168.100.12:9090", //IP raspberry (ifconfig)
+                    "ws://192.168.100.13:9090", //IP raspberry (ifconfig)
                     this,
                     findViewById(R.id.tvDistance),
                     findViewById(R.id.tvUltrasonic1),
                     findViewById(R.id.tvUltrasonic2),
                     findViewById(R.id.tvUltrasonic3),
-                    findViewById(R.id.tvDecision)
+                    findViewById(R.id.tvDecision),
+                    tvSignalStatus,  // Pasar el TextView para "No señalización"
+                    imgSignal  // Pasar el ImageVie
             );
             webSocketClient.connect();
 

@@ -1,7 +1,10 @@
 package com.example.controlmapavehiculo;
 
 import android.app.Activity;
+import android.os.Handler;
 import android.util.Log;
+import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import org.java_websocket.client.WebSocketClient;
@@ -19,12 +22,15 @@ public class ROSWebSocketClient extends WebSocketClient {
     private final TextView txtRight;
     private final TextView txtLeft;
     private final TextView txtDecision;
+    private final TextView tvSignalStatus;  // El TextView para "No señalización"
+    private final ImageView imgSignal;  // El ImageView para mostrar la señalización
+
 
     // Constructor que recibe el URI del servidor y la Activity
     public ROSWebSocketClient(
             String serverUri, Activity activity,
             TextView txtDistance, TextView txtCenter,
-            TextView txtRight, TextView txtLeft, TextView txtDecision)
+            TextView txtRight, TextView txtLeft, TextView txtDecision, TextView tvSignalStatus, ImageView imgSignal)
             throws URISyntaxException {
         super(new URI(serverUri));  // Llama al constructor de WebSocketClient con la URI del servidor
         this.activity = activity;  // Asigna la actividad para actualizar la interfaz de usuario
@@ -33,6 +39,8 @@ public class ROSWebSocketClient extends WebSocketClient {
         this.txtRight = txtRight;
         this.txtLeft = txtLeft;
         this.txtDecision = txtDecision;
+        this.tvSignalStatus = tvSignalStatus;  // Asigna el TextView
+        this.imgSignal = imgSignal;  // Asigna el ImageView
     }
 
     @Override
@@ -45,6 +53,7 @@ public class ROSWebSocketClient extends WebSocketClient {
         String subscribeRight = "{ \"op\": \"subscribe\", \"topic\": \"/right_tra_pub\" }";
         String subscribeLeft = "{ \"op\": \"subscribe\", \"topic\": \"/left_tra_pub\" }";
         String subscribeDecision = "{ \"op\": \"subscribe\", \"topic\": \"/decisiones_pub\" }";
+        String subscribeDetectionQr = "{ \"op\": \"subscribe\", \"topic\": \"/deteccionQr\" }";
 
         // Enviar los mensajes de suscripción al servidor
         send(subscribeUltrasonicos);
@@ -52,6 +61,8 @@ public class ROSWebSocketClient extends WebSocketClient {
         send(subscribeRight);
         send(subscribeLeft);
         send(subscribeDecision);
+        send(subscribeDetectionQr);  // Suscribe al tópico de detección de QR
+
     }
 
     @Override
@@ -116,6 +127,41 @@ public class ROSWebSocketClient extends WebSocketClient {
                             e.printStackTrace();  // Manejador de excepción
                         }
                         break;
+                    case "/deteccionQr":
+                        try {
+                            JSONObject jsonObject = new JSONObject(data);  // Convierte "data" en JSON
+                            String detectionMessage = jsonObject.getString("data"); // Extrae el mensaje de detección
+                            tvSignalStatus.setVisibility(View.VISIBLE); // Muestra el texto
+                            imgSignal.setVisibility(View.GONE); // Oculta la imagen
+                            tvSignalStatus.setText("No señalización"); // Actualiza el texto
+                            // Si el mensaje es "Alto", muestra la imagen
+                            if ("Alto".equals(detectionMessage)) {
+                                // Mostrar la imagen de señalización
+                                imgSignal.setVisibility(View.VISIBLE);
+                                tvSignalStatus.setVisibility(View.GONE); // Oculta el texto
+
+                                // Crear un Handler para ejecutar una acción después de 3 segundos (3000 ms)
+                                new Handler().postDelayed(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        // Después de 3 segundos, mostrar "No señalización"
+                                        tvSignalStatus.setVisibility(View.VISIBLE); // Muestra el texto
+                                        imgSignal.setVisibility(View.GONE); // Oculta la imagen
+                                        tvSignalStatus.setText("No señalización"); // Actualiza el texto
+                                    }
+                                }, 3000); // 3000 milisegundos = 3 segundos
+                            } else {
+                                // Si no es "Alto", mostrar el texto "No señalización"
+                                tvSignalStatus.setVisibility(View.VISIBLE); // Muestra el texto
+                                imgSignal.setVisibility(View.GONE); // Oculta la imagen
+                                tvSignalStatus.setText("No señalización"); // Actualiza el texto
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace(); // Manejo de errores si el JSON no es válido
+                        }
+
+                        break;
+
                 }
             } catch (Exception e) {
                 Log.e("ROSWebSocket", "Error al procesar mensaje: " + e.getMessage());  // Log de error en el procesamiento

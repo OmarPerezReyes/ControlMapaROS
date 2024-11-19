@@ -5,14 +5,17 @@
 #define TRIG_PIN 12
 #define ECHO_PIN 13
 
+// Definición de pines
+const int pinD2 = 2;
+const int pinD4 = 4;
+const int pinPWM1 = 5;  // Pin PWM para el motor 1
+const int pinPWM2 = 6;  // Pin PWM para el motor 2
+
 ros::NodeHandle nh;
 
 // Publishers
-std_msgs::String control_msg;
-ros::Publisher pub_control("control", &control_msg);
-
 std_msgs::Float32 distance_msg;
-ros::Publisher pub("ultrasonicos_pub", &distance_msg);
+ros::Publisher pub_distance("ultrasonicos_pub", &distance_msg);
 
 std_msgs::Float32 left_tra_msg;
 std_msgs::Float32 center_tra_msg;
@@ -24,28 +27,49 @@ ros::Publisher pub_right("right_tra_pub", &right_tra_msg);
 std_msgs::String decision_msg;
 ros::Publisher pub_decision("decisiones_pub", &decision_msg);
 
+std_msgs::String qr_msg;
+ros::Publisher pub_qr("deteccionQr", &qr_msg);
+
 // Variables de estado y velocidad
-volatile int Left_Tra_Value;
-volatile int Center_Tra_Value;
-volatile int Right_Tra_Value;
-volatile int speed = 60;
+volatile int Left_Tra_Value = 0;
+volatile int Center_Tra_Value = 0;
+volatile int Right_Tra_Value = 0;
+volatile int speed = 10;
 bool automatic_mode = false;
+
+// Variables para controlar la frecuencia de las lecturas de los sensores
+unsigned long last_sensor_reading = 0;
+unsigned long sensor_interval = 100;  // Intervalo de 100ms para leer sensores
+
+unsigned long last_pub_time = 0;
+unsigned long pub_interval = 1000; // Intervalo de publicación de 1 segundo
 
 void controlCallback(const std_msgs::String &msg) {
     String data = String(msg.data);
-    if (data.indexOf("aut") != -1) {
-        if (!automatic_mode) {
-            automatic_mode = true;
-            nh.loginfo("Modo Automático activado.");
-        }
-    } else {
-        if (automatic_mode) {
-            automatic_mode = false;
-            nh.loginfo("Modo Manual activado.");
-            STOP();
-        }
+    if (data == "aut" && !automatic_mode) {
+        automatic_mode = true;
+        nh.loginfo("Modo Automático activado.");
+    } else if (data != "aut" && automatic_mode) {
+        automatic_mode = false;
+        nh.loginfo("Modo Manual activado.");
+        STOP();
     }
 }
+
+void qrCallback(const std_msgs::String &msg) {
+    //nh.loginfo(msg.data);
+    String data = String(msg.data);
+    if (data == "Alto") {
+        nh.loginfo("Se detectó Alto");
+        STOP();
+        delay(4000);
+    }
+    /* else {
+        nh.loginfo("Se detectó Avanzar");
+        Move_Forward(speed);
+    }*/
+}
+
 
 void decisionCallback(const std_msgs::String &msg) {
     if (!automatic_mode) {
@@ -59,7 +83,10 @@ void decisionCallback(const std_msgs::String &msg) {
         } else if (decision == "Recto") {
             Move_Forward(speed);
         } else if (decision == "Reversa") {
-            Move_Backward(30);
+            Move_Backward(15);
+        }
+        else{
+          STOP();
         }
     }
 }
@@ -67,92 +94,104 @@ void decisionCallback(const std_msgs::String &msg) {
 // Subscribers
 ros::Subscriber<std_msgs::String> sub_control("control", controlCallback);
 ros::Subscriber<std_msgs::String> sub_decision("decisiones_pub", decisionCallback);
+ros::Subscriber<std_msgs::String> sub_qr("deteccionQr", qrCallback);
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(57600);
     nh.initNode();
-    nh.advertise(pub);
+
+    // Publicadores y suscriptores
+    nh.advertise(pub_distance);
     nh.advertise(pub_left);
     nh.advertise(pub_center);
     nh.advertise(pub_right);
+    nh.advertise(pub_qr); // Añadido para deteccionQr
     nh.advertise(pub_decision);
     nh.subscribe(sub_control);
+    nh.subscribe(sub_qr);
     nh.subscribe(sub_decision);
 
     pinMode(TRIG_PIN, OUTPUT);
     pinMode(ECHO_PIN, INPUT);
-    pinMode(1, INPUT);
-    pinMode(2, INPUT);
-    pinMode(3, INPUT);
+    pinMode(pinD2, OUTPUT);
+    pinMode(pinD4, OUTPUT);
+    pinMode(pinPWM1, OUTPUT);
+    pinMode(pinPWM2, OUTPUT);
+
+
+    // Publicación inicial para deteccionQr
+    qr_msg.data = "8"; // Publica el valor "8" al tópico deteccionQr
+    pub_qr.publish(&qr_msg);
+    
+    // Mensaje de inicialización
+    nh.loginfo("Nodo de ROS inicializado.");
 }
 
 void Infrared_Tracing(int speed) {
-    Left_Tra_Value = analogRead(3);
-    Center_Tra_Value = analogRead(1);
-    Right_Tra_Value = analogRead(2);
-    if (automatic_mode) {
-        if (Left_Tra_Value < 200 && Center_Tra_Value > 200 && Right_Tra_Value < 200) {
-            Move_Forward(speed);
-            decision_msg.data = "Recto";
-        } else if (Left_Tra_Value > 200 && Center_Tra_Value < 200 && Right_Tra_Value > 200) {
-            Move_Forward(speed);
-            decision_msg.data = "Recto";
-        } else if (Left_Tra_Value > 200 && Center_Tra_Value > 200 && Right_Tra_Value < 200) {
-            vuelta_izquierda(speed, 2.3);
-            decision_msg.data = "Izquierda";
-        } else if (Left_Tra_Value < 200 && Center_Tra_Value > 200 && Right_Tra_Value > 200) {
-            vuelta_derecha(speed, 2.3);
-            decision_msg.data = "Derecha";
-        } else if (Left_Tra_Value < 200 && Center_Tra_Value < 200 && Right_Tra_Value > 200) {
-            vuelta_derecha(speed, 2.8);
-            decision_msg.data = "Derecha";
-        } else if (Left_Tra_Value > 200 && Center_Tra_Value < 200 && Right_Tra_Value < 200) {
-            vuelta_izquierda(speed, 2.8);
-            decision_msg.data = "Izquierda";
-        } else if (Left_Tra_Value > 200 && Center_Tra_Value > 200 && Right_Tra_Value > 200) {
-            STOP();
-            decision_msg.data = "Detenerse";
-        } else if (Left_Tra_Value < 200 && Center_Tra_Value < 200 && Right_Tra_Value < 200) {
-            Move_Backward(30);
-            decision_msg.data = "Reversa";
-        }
+    speed = 10;
+    if (Left_Tra_Value < 200 && Center_Tra_Value > 200 && Right_Tra_Value < 200) {
+      
+        Move_Forward(speed);
+        decision_msg.data = "Recto";
+    } else if (Left_Tra_Value > 200 && Center_Tra_Value < 200 && Right_Tra_Value > 200) {
+        Move_Forward(speed);
+        decision_msg.data = "Recto";
+    } else if (Left_Tra_Value > 200 && Center_Tra_Value > 200 && Right_Tra_Value < 200) {
+        vuelta_izquierda(speed, .8);
+        decision_msg.data = "Izquierda";
+    } else if (Left_Tra_Value < 200 && Center_Tra_Value > 200 && Right_Tra_Value > 200) {
+        vuelta_derecha(speed, .8);
+        decision_msg.data = "Derecha";
+    } else if (Left_Tra_Value < 200 && Center_Tra_Value < 200 && Right_Tra_Value > 200) {
+        vuelta_derecha(speed, 1.3);
+        decision_msg.data = "Derecha";
+    } else if (Left_Tra_Value > 200 && Center_Tra_Value < 200 && Right_Tra_Value < 200) {
+        vuelta_izquierda(speed, 1.3);
+        decision_msg.data = "Izquierda";
+    } else if (Left_Tra_Value > 200 && Center_Tra_Value > 200 && Right_Tra_Value > 200) {
+        STOP();
+        decision_msg.data = "Detenerse";
+    } else if (Left_Tra_Value < 200 && Center_Tra_Value < 200 && Right_Tra_Value < 200) {
+        Move_Backward(5);
+        decision_msg.data = "Reversa";
     }
+
     pub_decision.publish(&decision_msg);
 }
 
 void STOP() {
-    digitalWrite(2, LOW);
-    analogWrite(5, 0);
-    digitalWrite(4, HIGH);
-    analogWrite(6, 0);
-}
-
-void Move_Forward(int car_speed) {
-    digitalWrite(2, HIGH);
-    analogWrite(5, car_speed);
-    digitalWrite(4, LOW);
-    analogWrite(6, car_speed);
+    analogWrite(pinPWM1, 0);  // Detiene motor 1
+    analogWrite(pinPWM2, 0);  // Detiene motor 2
+    digitalWrite(pinD2, LOW); // Apaga motor 1
+    digitalWrite(pinD4, LOW); // Apaga motor 2
 }
 
 void Move_Backward(int car_speed) {
-    digitalWrite(2, LOW);
-    analogWrite(5, car_speed);
-    digitalWrite(4, HIGH);
-    analogWrite(6, car_speed);
+    digitalWrite(pinD2, LOW);
+    analogWrite(pinPWM1, 38); // Motor 1 en retroceso
+    digitalWrite(pinD4, HIGH);
+    analogWrite(pinPWM2, 38); // Motor 2 en retroceso
+}
+
+void Move_Forward(int car_speed) {
+    digitalWrite(pinD2, HIGH);  // Motor 1 adelante
+    analogWrite(pinPWM1, 45); // Controla la velocidad del motor 1
+    digitalWrite(pinD4, LOW);   // Motor 2 en dirección adelante
+    analogWrite(pinPWM2, 45); // Controla la velocidad del motor 2
 }
 
 void vuelta_derecha(int car_speed, float k) {
-    digitalWrite(2, HIGH);
-    analogWrite(5, car_speed * k);
-    digitalWrite(4, LOW);
-    analogWrite(6, car_speed);
+    digitalWrite(pinD2, HIGH);  // Motor 1 adelante
+    analogWrite(pinPWM1, 45);
+    digitalWrite(pinD4, HIGH);  // Motor 2 adelante
+    analogWrite(pinPWM2, 45);
 }
 
 void vuelta_izquierda(int car_speed, float k) {
-    digitalWrite(2, HIGH);
-    analogWrite(5, car_speed);
-    digitalWrite(4, LOW);
-    analogWrite(6, car_speed * k);
+    digitalWrite(pinD2, LOW);  // Motor 1 retroceso
+    analogWrite(pinPWM1, 45);
+    digitalWrite(pinD4, LOW);  // Motor 2 retroceso
+    analogWrite(pinPWM2, 45);
 }
 
 float checkdistance() {
@@ -164,42 +203,23 @@ float checkdistance() {
     return pulseIn(ECHO_PIN, HIGH) / 58.00;
 }
 
-void conexion() {
-    if (Serial.available() > 0) {
-        int dato = Serial.parseInt();
-        switch (dato) {
-            case 1:
-                Infrared_Tracing(speed);
-                break;
-            case 3:
-                speed = 60;
-                break;
-            case 5:
-                STOP();
-                break;
-            case 8:
-                Move_Forward(speed);
-                break;
-            case 2:
-                Move_Backward(30);
-                break;
-            case 6:
-                vuelta_derecha(speed, 2);
-                break;
-            case 4:
-                vuelta_izquierda(speed, 2);
-                break;
-        }
-    }
-}
-
 void loop() {
-    nh.spinOnce();
+    nh.spinOnce(); // Procesa la comunicación con ROS, ejecuta callbacks y loginfo
 
-    if (automatic_mode) {
-        float d = checkdistance();
-        distance_msg.data = d;
-        pub.publish(&distance_msg);
+    unsigned long currentMillis = millis();
+
+    // Lectura de sensores cada 100 ms
+    if (currentMillis - last_sensor_reading >= sensor_interval) {
+        Left_Tra_Value = analogRead(3);
+        Center_Tra_Value = analogRead(1);
+        Right_Tra_Value = analogRead(2);
+        last_sensor_reading = currentMillis;
+    }
+
+    // Publicación de datos cada 1 segundo
+    if (currentMillis - last_pub_time >= pub_interval) {
+        distance_msg.data = checkdistance();
+        pub_distance.publish(&distance_msg);
 
         left_tra_msg.data = Left_Tra_Value;
         center_tra_msg.data = Center_Tra_Value;
@@ -209,19 +229,12 @@ void loop() {
         pub_center.publish(&center_tra_msg);
         pub_right.publish(&right_tra_msg);
 
-        if (d < 8) {
-            Move_Backward(40);
-            decision_msg.data = "Reversa";
-            pub_decision.publish(&decision_msg);
-        } else if (d < 15) {
-            STOP();
-            decision_msg.data = "Detenerse";
-            pub_decision.publish(&decision_msg);
-        } else {
-            conexion();
-            Infrared_Tracing(speed);
-        }
+        last_pub_time = currentMillis;
     }
 
-    delay(100);
-}
+    // Modo automático
+    if (automatic_mode) {
+        speed = 10;
+        float d = checkdistance();
+        Infrared_Tracing(speed);
+    }delay(10);}
